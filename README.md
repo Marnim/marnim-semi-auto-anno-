@@ -1,1 +1,1 @@
-# marnim-semi-auto-anno-
+Semi-automatic handpose
