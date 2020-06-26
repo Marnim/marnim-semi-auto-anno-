@@ -1092,15 +1092,15 @@ class MSRA15Importer(DepthImporter):
         self.detectorNet = detectorNet
         self.numJoints = 21
         self.crop_joint_idx = 9
-        self.default_cubes = {'P0': (200, 200, 200),
-                              'P1': (200, 200, 200),
-                              'P2': (200, 200, 200),
-                              'P3': (180, 180, 180),
-                              'P4': (180, 180, 180),
-                              'P5': (180, 180, 180),
-                              'P6': (170, 170, 170),
-                              'P7': (160, 160, 160),
-                              'P8': (150, 150, 150)}
+        self.default_cubes = {'P0': (170, 170, 170),
+                              'P1': (156, 156, 156),
+                              'P2': (179, 179, 179),
+                              'P3': (157, 157, 157),
+                              'P4': (146, 146, 146),
+                              'P5': (139, 139, 139),
+                              'P6': (186, 186, 186),
+                              'P7': (154, 154, 154),
+                              'P8': (190, 190, 190)}
         self.sides = {'P0': 'right', 'P1': 'right', 'P2': 'right', 'P3': 'right', 'P4': 'right', 'P5': 'right',
                       'P6': 'right', 'P7': 'right', 'P8': 'right'}
 
@@ -1150,6 +1150,7 @@ class MSRA15Importer(DepthImporter):
 
         if cube is None:
             config = {'cube': self.default_cubes[seqName]}
+            cub = self.default_cubes[seqName]
         else:
             assert isinstance(cube, tuple)
             assert len(cube) == 3
@@ -1261,7 +1262,9 @@ class MSRA15Importer(DepthImporter):
                         cube_ = cube_0
                     else:
                         cube_ = cube
-                    dpt, M, com = hd.cropArea3D(com=gtorig[self.crop_joint_idx], size=cube_, docom=docom,dsize=(128,128))
+                    # dpt, M, com = hd.cropArea3D(com=gtorig[self.crop_joint_idx], size=cube_, docom=docom,dsize=(160,160))
+                    dpt, M, com = hd.cropArea3D(com = None, size=cube_, docom=docom,
+                                                dsize=(128, 128))
                     #print cube_
                     # import matplotlib.pyplot as plt
                     # plt.imshow(dpt)

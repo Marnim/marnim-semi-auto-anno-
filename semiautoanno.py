@@ -2215,6 +2215,7 @@ class SemiAutoAnno:
         if False:
             raise NotImplementedError("!")
         else:
+            eng = matlab.engine.start_matlab()
             # quick and dirty call of matlab script
             scipy.io.savemat("./etc/sift_flow/input_{}.mat".format(os.getpid()),
                              {'in1': self.Di[ref_idx, 0], 'in2': self.Di[idx, 0]})
@@ -2273,6 +2274,7 @@ class SemiAutoAnno:
         return dist
 
     def getImageDescriptors_HOG(self, images, useMask=True, doNormalize=True):
+        #changed for msra
         win_size = (128, 128)
         block_size = (32, 32)
         block_stride = (16, 16)
