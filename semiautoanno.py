@@ -1919,7 +1919,7 @@ class SemiAutoAnno:
                         bbox_inches='tight')
             plt.close(fig)
 
-    def getReferenceForSample(self, i, init3D, doOffset=True):
+    def getReferenceForSample(self, i, init3D, best_ref_idx):
         """
         Gets closest reference frame in appearance for given frame
         therefore shift sample frame by some offset to find best alignment
@@ -1928,140 +1928,21 @@ class SemiAutoAnno:
         :return: reference frame index, offset 2D in px, offset 3D in mm
         """
 
-        unannotated = numpy.setdiff1d(numpy.arange(self.numSamples), self.subset_idxs, assume_unique=True)
-
-        def idxToOff(boi):
-            ad = boi % 5
-            st = boi // 5 + 1
-            if ad == 0:
-                return numpy.asarray([[0, 0]]).repeat(self.numJoints, axis=0)
-            elif ad == 1:
-                return numpy.asarray([[int(shift*st), -int(shift*st)]]).repeat(self.numJoints, axis=0)
-            elif ad == 2:
-                return numpy.asarray([[-int(shift*st), int(shift*st)]]).repeat(self.numJoints, axis=0)
-            elif ad == 3:
-                return numpy.asarray([[int(shift*st), int(shift*st)]]).repeat(self.numJoints, axis=0)
-            elif ad == 4:
-                return numpy.asarray([[-int(shift*st), -int(shift*st)]]).repeat(self.numJoints, axis=0)
-            else:
-                raise NotImplementedError("Internal error!")
-
-        shift = 2
-        steps = 4
-
-        if 'init_refwithinsequence' in self.eval_params:
-            if self.eval_params['init_refwithinsequence'] is True:
-                # sequence break is inclusive
-                if i <= self.sequenceBreaks[0]:
-                    seq_l = 0
-                else:
-                    d1 = i-numpy.asarray(self.sequenceBreaks)
-                    d1[d1 <= 0] = self.numSamples+1
-                    idx_k = numpy.argmin(d1)
-                    seq_l = self.sequenceBreaks[idx_k]
-                if i > self.sequenceBreaks[-1]:
-                    seq_h = self.numSamples
-                else:
-                    d2 = i-numpy.asarray(self.sequenceBreaks)
-                    d2[d2 > 0] = self.numSamples+1
-                    idx_kp1 = numpy.argmin(numpy.abs(d2))
-                    seq_h = self.sequenceBreaks[idx_kp1]
-                mask = numpy.ones((self.numSubset,), dtype='bool')
-                mask[numpy.bitwise_and(self.subset_idxs >= seq_l, self.subset_idxs <= seq_h)] = 0
-                mask = numpy.tile(mask, (5*steps, 1))
-            else:
-                mask = numpy.zeros((5*steps, self.numSubset), dtype='bool')
-        else:
-            raise NotImplementedError("Missing parameter 'init_refwithinsequence'")
-
-        # lazy init to save time
-        if not hasattr(self, 'ref_emb'):
-            if 'ref_descriptor' in self.eval_params:
-                if self.eval_params['ref_descriptor'] == 'hog_msk':
-                    if self.useCache:
-                        self.ref_emb, self.ref_mask = self.getImageDescriptors_HOG(self.Di[self.subset_idxs, :, :, :])
-                        self.sample_emb = self.Ri[unannotated]
-                    else:
-                        self.ref_emb, self.ref_mask = self.getImageDescriptors_HOG(self.Di[self.subset_idxs, :, :, :])
-                        self.sample_emb, _ = self.getImageDescriptors_HOG(self.Di[unannotated, :, :, :],
-                                                                          useMask=False, doNormalize=False)
-                elif self.eval_params['ref_descriptor'] == 'hog':
-                    if self.useCache:
-                        self.ref_emb = self.Ri[self.subset_idxs]
-                        self.sample_emb = self.Ri[unannotated]
-                    else:
-                        self.ref_emb, _ = self.getImageDescriptors_HOG(self.Di[self.subset_idxs, :, :, :],
-                                                                       useMask=False, doNormalize=True)
-                        self.sample_emb, _ = self.getImageDescriptors_HOG(self.Di[unannotated, :, :, :],
-                                                                          useMask=False, doNormalize=True)
-                else:
-                    raise NotImplementedError("Unknown parameter: "+self.eval_params['ref_descriptor'])
-            else:
-                raise NotImplementedError("Missing parameter 'ref_descriptor'")
-
-        queryImg = numpy.zeros((5*steps, 1, self.Di.shape[2], self.Di.shape[3]))
-        for st in range(1, steps+1):
-            for ad in range(5):
-                # shift to 0, +1, -1
-                if ad == 0:
-                    off = (0, 0)
-                elif ad == 1:
-                    off = (int(shift*st), -int(shift*st))
-                elif ad == 2:
-                    off = (-int(shift*st), int(shift*st))
-                elif ad == 3:
-                    off = (int(shift*st), int(shift*st))
-                elif ad == 4:
-                    off = (-int(shift*st), -int(shift*st))
-
-                imgD = self.Di[i, 0].copy()
-                # shift by padding
-                if off[0] > 0:
-                    imgD = numpy.pad(imgD, ((0, 0), (off[0], 0)), mode='constant', constant_values=(1., ))[:, :-off[0]]
-                elif off[0] < 0:
-                    imgD = numpy.pad(imgD, ((0, 0), (0, -off[0])), mode='constant', constant_values=(1., ))[:, -off[0]:]
-
-                if off[1] > 0:
-                    imgD = numpy.pad(imgD, ((off[1], 0), (0, 0)), mode='constant', constant_values=(1., ))[:-off[1], :]
-                elif off[1] < 0:
-                    imgD = numpy.pad(imgD, ((0, -off[1]), (0, 0)), mode='constant', constant_values=(1., ))[-off[1]:, :]
-
-                queryImg[(st-1)*5+ad, 0] = imgD
-
-        if 'ref_descriptor' in self.eval_params:
-            if self.eval_params['ref_descriptor'] == 'hog_msk':
-                sample_emb, _ = self.getImageDescriptors_HOG(queryImg, useMask=False, doNormalize=False)
-                dist = self.getImageDescriptors_HOG_cdist(sample_emb, self.ref_emb, self.ref_mask)
-                best_off_idx, best_ref_idx = numpy.unravel_index(numpy.ma.array(dist, mask=mask).argmax(), dist.shape)
-            elif self.eval_params['ref_descriptor'] == 'hog':
-                sample_emb, _ = self.getImageDescriptors_HOG(queryImg, useMask=False, doNormalize=True)
-                dist = pairwise_distances(sample_emb, self.ref_emb, metric='cosine')
-                best_off_idx, best_ref_idx = numpy.unravel_index(numpy.ma.array(dist, mask=mask).argmin(), dist.shape)
-            else:
-                raise NotImplementedError("Unknown parameter: "+self.eval_params['ref_descriptor'])
-        else:
-            raise NotImplementedError("Missing parameter 'ref_descriptor'")
 
         # further alignment
         if 'init_offset' in self.eval_params:
-            if doOffset:
-                if self.eval_params['init_offset'] == 'siftflow':
-                    # use offset in 2D wrt to the reference frame
-                    if numpy.allclose(init3D[self.subset_idxs[best_ref_idx]], 0.):
-                        print "WARNING: init is not set! No SIFTflow aligment possible."
-                        warpImg = self.Di[i, 0]
-                    else:
-                        li2D = self.project3Dto2D(init3D[self.subset_idxs[best_ref_idx]],
-                                                  self.subset_idxs[best_ref_idx]).reshape(self.numJoints, 2)
-                        best_off2D_glob, warpImg = self.alignSIFTFlow(li2D, self.subset_idxs[best_ref_idx], i)
-                    best_off3D_glob = numpy.zeros((self.numJoints, 3))
+            if self.eval_params['init_offset'] == 'siftflow':
+                # use offset in 2D wrt to the reference frame
+                if numpy.allclose(init3D[best_ref_idx], 0.):
+                    print "WARNING: init is not set! No SIFTflow aligment possible."
+                    warpImg = self.Di[i, 0]
                 else:
-                    raise NotImplementedError("Unknown parameter 'init_offset' {}".format(self.eval_params['init_offset']))
-            else:
-                # reset offset
-                best_off2D_glob = idxToOff(best_off_idx)
+                    li2D = self.project3Dto2D(init3D[best_ref_idx],
+                                              best_ref_idx).reshape(self.numJoints, 2)
+                    best_off2D_glob, warpImg = self.alignSIFTFlow(li2D, best_ref_idx, i)
                 best_off3D_glob = numpy.zeros((self.numJoints, 3))
-                warpImg = self.Di[i, 0]
+            else:
+                raise NotImplementedError("Unknown parameter 'init_offset' {}".format(self.eval_params['init_offset']))
         else:
             raise NotImplementedError("Missing parameter 'init_offset'")
 
@@ -2119,57 +2000,16 @@ class SemiAutoAnno:
         #print "BEST for i={}: ref={}, off2D={}, off3D={}".format(i, self.subset_idxs[best_ref_idx],
                                                              #best_off2D.tolist(), best_off3D.tolist())
 
-        return self.subset_idxs[best_ref_idx], best_off2D, best_off3D
+        return best_off2D, best_off3D
 
-    def getClosestSampleForReference(self, init3D):
+    def getClosestSampleForReference(self, init3D, best_ref_idx, best_sample_idx):
         """
         Given the reference frames, get the closest unannotated sample in appearance
         :param init3D: 3D location of joint data
         :return: sample frame index, reference frame index
         """
 
-        unannotated = numpy.setdiff1d(numpy.arange(self.numSamples), self.subset_idxs, assume_unique=True)
 
-        # lazy init to save time
-        if not hasattr(self, 'ref_emb'):
-            if 'ref_descriptor' in self.eval_params:
-                if self.eval_params['ref_descriptor'] == 'hog_msk':
-                    if self.useCache:
-                        self.ref_emb, self.ref_mask = self.getImageDescriptors_HOG(self.Di[self.subset_idxs, :, :, :])
-                        self.sample_emb = self.Ri[unannotated]
-                    else:
-                        self.ref_emb, self.ref_mask = self.getImageDescriptors_HOG(self.Di[self.subset_idxs, :, :, :])
-                        self.sample_emb, _ = self.getImageDescriptors_HOG(self.Di[unannotated, :, :, :],
-                                                                          useMask=False, doNormalize=False)
-                elif self.eval_params['ref_descriptor'] == 'hog':
-                    if self.useCache:
-                        self.ref_emb = self.Ri[self.subset_idxs]
-                        self.sample_emb = self.Ri[unannotated]
-                    else:
-                        self.ref_emb, _ = self.getImageDescriptors_HOG(self.Di[self.subset_idxs, :, :, :],
-                                                                       useMask=False, doNormalize=True)
-                        self.sample_emb, _ = self.getImageDescriptors_HOG(self.Di[unannotated, :, :, :],
-                                                                          useMask=False, doNormalize=True)
-                else:
-                    raise NotImplementedError("Unknown parameter: "+self.eval_params['ref_descriptor'])
-            else:
-                raise NotImplementedError("Missing parameter 'ref_descriptor'")
-
-        # check consistency
-        assert self.sample_emb.shape[0] + self.ref_emb.shape[0] == self.numSamples
-        assert self.ref_emb.shape[0] == len(self.subset_idxs)
-
-        if 'ref_descriptor' in self.eval_params:
-            if self.eval_params['ref_descriptor'] == 'hog_msk':
-                dist = self.getImageDescriptors_HOG_cdist(self.sample_emb, self.ref_emb, self.ref_mask)
-                best_sample_idx, best_ref_idx = numpy.unravel_index(numpy.argmax(dist), dist.shape)
-            elif self.eval_params['ref_descriptor'] == 'hog':
-                dist = pairwise_distances(self.sample_emb, self.ref_emb, metric='cosine')
-                best_sample_idx, best_ref_idx = numpy.unravel_index(numpy.argmin(dist), dist.shape)
-            else:
-                raise NotImplementedError("Unknown parameter: "+self.eval_params['ref_descriptor'])
-        else:
-            raise NotImplementedError("Missing parameter 'ref_descriptor'")
 
         # further alignment
         if 'init_offset' in self.eval_params:
@@ -2178,29 +2018,20 @@ class SemiAutoAnno:
                 if numpy.allclose(init3D[self.subset_idxs[best_ref_idx]], 0.):
                     print "WARNING: init is not set! No SIFTflow aligment possible."
                 else:
-                    li2D = self.project3Dto2D(init3D[self.subset_idxs[best_ref_idx]],
-                                              self.subset_idxs[best_ref_idx]).reshape(self.numJoints, 2)
-                    off2D, _ = self.alignSIFTFlow(li2D, self.subset_idxs[best_ref_idx], unannotated[best_sample_idx])
+                    li2D = self.project3Dto2D(init3D[best_ref_idx],
+                                              best_ref_idx).reshape(self.numJoints, 2)
+                    off2D, _ = self.alignSIFTFlow(li2D, best_ref_idx, best_sample_idx)
                 off3D = numpy.zeros((self.numJoints, 3))
             else:
                 raise NotImplementedError("Unknown parameter 'init_offset' {}".format(self.eval_params['init_offset']))
         else:
             raise NotImplementedError("Missing parameter 'init_offset'")
 
-        if self.debugPrint:
-            import matplotlib.pyplot as plt
-            fig = plt.figure()
-            plt.imshow(numpy.concatenate([self.Di[unannotated[best_sample_idx], 0],
-                                          self.Di[self.subset_idxs[best_ref_idx], 0]]), cmap='gray')
-            plt.show(block=False)
-            fig.savefig(self.eval_prefix+'/pairs_{}.png'.format(unannotated[best_sample_idx]), bbox_inches='tight')
-            plt.close(fig)
-
         # print "BEST for i={}: ref={}, off2D={}, off3D={}".format(unannotated[best_sample_idx],
         #                                                          self.subset_idxs[best_ref_idx],
         #                                                          off2D.tolist(), off3D.tolist())
 
-        return unannotated[best_sample_idx], self.subset_idxs[best_ref_idx], off2D, off3D
+        return off2D, off3D
 
     def alignSIFTFlow(self, li2D, ref_idx, idx):
         """
@@ -2215,7 +2046,6 @@ class SemiAutoAnno:
         if False:
             raise NotImplementedError("!")
         else:
-            eng = matlab.engine.start_matlab()
             # quick and dirty call of matlab script
             scipy.io.savemat("./etc/sift_flow/input_{}.mat".format(os.getpid()),
                              {'in1': self.Di[ref_idx, 0], 'in2': self.Di[idx, 0]})
@@ -2485,8 +2315,8 @@ class SemiAutoAnno:
 
         corrected = []
         start = time.time()
-
-        for isa in xrange(self.numSamples):
+        frames_sort_array = numpy.load(self.eval_prefix+"/sort_array.npy")
+        for isa in frames_sort_array:
 
             if init_aligned_cache is False:
                 if 'init_incrementalref' in self.eval_params:
@@ -2499,7 +2329,12 @@ class SemiAutoAnno:
                         i, ref_idx, off2D, off3D = self.getClosestSampleForReference(init)
                         assert i not in self.subset_idxs
                     else:
-                        ref_idx, off2D, off3D = self.getReferenceForSample(isa, init)
+                        print "Unannotated frames: {}".format(frames_sort_array.shape[0] - len(self.subset_idxs))
+                        if isa in self.subset_idxs:
+                            ref_idx = isa
+                        else:
+                            ref_idx = frames_sort_array[numpy.where(frames_sort_array == isa)[0]-1]
+                        off2D, off3D = self.getReferenceForSample(isa, init, ref_idx)
                         i = isa
                 else:
                     raise NotImplementedError("Missing parameter 'init_incrementalref'")
@@ -2560,7 +2395,7 @@ class SemiAutoAnno:
                 # create template patches and pad them
                 templ_k = self.Di[ref_idx, 0, max(ystart_k, 0):min(yend_k, self.Di.shape[2]),
                                   max(xstart_k, 0):min(xend_k, self.Di.shape[3])].copy()
-                templ_k = numpy.pad(templ_k, ((abs(ystart_k)-max(ystart_k, 0), abs(yend_k)-min(yend_k, self.Di.shape[2])),
+                templ_k = numpy.pad(templ_k.reshape(templ_k.shape[1], templ_k.shape[2]), ((abs(ystart_k)-max(ystart_k, 0), abs(yend_k)-min(yend_k, self.Di.shape[2])),
                                               (abs(xstart_k)-max(xstart_k, 0), abs(xend_k)-min(xend_k, self.Di.shape[3]))),
                                     mode='constant', constant_values=(1.,))
 
@@ -2749,25 +2584,26 @@ class SemiAutoAnno:
                 raise NotImplementedError("Missing parameter 'init_manualrefinement'")
 
             if 'init_incrementalref' in self.eval_params:
-                if self.eval_params['init_incrementalref'] is True:
-                    if hasattr(self, 'ref_emb') and hasattr(self, 'sample_emb'):
-                        if i not in self.subset_idxs:
-                            sidx = numpy.where(unannotated == i)[0][0]
-                            # add element to reference frames
-                            self.li = numpy.vstack((self.li, self.project3Dto2D(init[i], i).reshape(1, self.numJoints*2)))
-                            self.subset_idxs = numpy.append(self.subset_idxs, i)
-                            self.numSubset += 1
-                            self.addPBVisForLi(i)
-                            self.li3D_aug = numpy.vstack((self.li3D_aug, init[i].reshape(1, self.numJoints, 3)))
-                            self.ref_emb = numpy.vstack((self.ref_emb, self.sample_emb[sidx][None, :]))
-                            self.sample_emb = numpy.delete(self.sample_emb, sidx, axis=0)
-                            if self.eval_params['ref_descriptor'] == 'hog_msk':
-                                raise NotImplementedError("")
-                                self.ref_mask = numpy.vstack((self.ref_mask, sample_mask[sidx][None, :]))
-                    else:
-                        raise NotImplementedError("ref_emb or sample_emb not set!")
-            else:
-                raise NotImplementedError("Missing parameter 'init_incrementalref'")
+                # if self.eval_params['init_incrementalref'] is True:
+                #     if hasattr(self, 'ref_emb') and hasattr(self, 'sample_emb'):
+                if i not in self.subset_idxs:
+                    # sidx = numpy.where(unannotated == i)[0][0]
+                    # add element to reference frames
+                    self.li = numpy.vstack((self.li, self.project3Dto2D(init[i], i).reshape(1, self.numJoints*2)))
+                    self.subset_idxs = numpy.append(self.subset_idxs, i)
+                    self.numSubset += 1
+                    self.addPBVisForLi(i)
+                    self.li3D_aug = numpy.vstack((self.li3D_aug, init[i].reshape(1, self.numJoints, 3)))
+                    # self.ref_emb = numpy.vstack((self.ref_emb, self.sample_emb[sidx][None, :]))
+                    # self.sample_emb = numpy.delete(self.sample_emb, sidx, axis=0)
+                    if self.eval_params['ref_descriptor'] == 'hog_msk':
+                        raise NotImplementedError("")
+                        self.ref_mask = numpy.vstack((self.ref_mask, sample_mask[sidx][None, :]))
+                    # else:
+                    #     raise NotImplementedError("ref_emb or sample_emb not set!")
+
+            # else:
+            #     raise NotImplementedError("Missing parameter 'init_incrementalref'")
 
             pbar.update(isa)
 
@@ -2883,7 +2719,7 @@ class SemiAutoAnno:
                     dptinit *= self.Di_scale[idx]
                     dptinit += self.Di_off3D[idx, 2]
                 # add element to reference frames
-                unannotated = numpy.setdiff1d(numpy.arange(self.numSamples), self.subset_idxs, assume_unique=True)
+                # unannotated = numpy.setdiff1d(numpy.arange(self.numSamples), self.subset_idxs, assume_unique=True)
                 self.li = numpy.vstack((self.li, li2D.reshape(1, self.numJoints*2)))
                 self.subset_idxs = numpy.append(self.subset_idxs, idx)
                 self.numSubset += 1
@@ -2891,15 +2727,15 @@ class SemiAutoAnno:
                 new_li3D = self.augmentLi3D(li2D.reshape(1, self.numJoints, 2), idx, dptinit)
                 self.li3D_aug = numpy.vstack((self.li3D_aug, new_li3D))
 
-                if hasattr(self, 'ref_emb') and hasattr(self, 'sample_emb'):
-                    sidx = numpy.where(unannotated == idx)[0][0]
-                    self.ref_emb = numpy.vstack((self.ref_emb, self.sample_emb[sidx][None, :]))
-                    self.sample_emb = numpy.delete(self.sample_emb, sidx, axis=0)
-                    if self.eval_params['ref_descriptor'] == 'hog_msk':
-                        raise NotImplementedError("")
-                        self.ref_mask = numpy.vstack((self.ref_mask, new_mask))
-                else:
-                    raise NotImplementedError("ref_emb and sample_emb not set!")
+                # if hasattr(self, 'ref_emb') and hasattr(self, 'sample_emb'):
+                #     sidx = numpy.where(unannotated == idx)[0][0]
+                #     self.ref_emb = numpy.vstack((self.ref_emb, self.sample_emb[sidx][None, :]))
+                #     self.sample_emb = numpy.delete(self.sample_emb, sidx, axis=0)
+                #     if self.eval_params['ref_descriptor'] == 'hog_msk':
+                #         raise NotImplementedError("")
+                #         self.ref_mask = numpy.vstack((self.ref_mask, new_mask))
+                # else:
+                #     raise NotImplementedError("ref_emb and sample_emb not set!")
 
                 print "Corrected: ", jcorr
                 print "New accuracy: ", self.evaluateToGT(new_li3D.reshape(1, self.numJoints, 3), [idx])

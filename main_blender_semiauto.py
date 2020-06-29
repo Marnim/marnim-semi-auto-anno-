@@ -36,6 +36,7 @@ from util.handpose_evaluation import MSRA2HandposeEvaluation
 from util.handpose_evaluation import ICVLHandposeEvaluation
 from util.handpose_evaluation import NYUHandposeEvaluation
 import theano
+from util.sort import find_reference_frames
 
 if __name__ == '__main__':
     print(theano.config.device)
@@ -164,35 +165,6 @@ if __name__ == '__main__':
 
         hc = ICVLHandConstraints([Seq1_0.name])
         return di, hc, trainSeqs, train_data, train_gt3D, imgSizeW, imgSizeH, nChannels, hpe
-    
-    def import_alex():
-        di = ALEXImporter(data_folder)
-        Seq1_0 = di.loadSequence('hpseq_loop_mv', camera=0, shuffle=False)
-        trainSeqs = [Seq1_0]
-
-        # create training data
-        trainDataSet = ALEXDataset(trainSeqs)
-        dat = []
-        gt = []
-        for seq in trainSeqs:
-            d, g = trainDataSet.imgStackDepthOnly(seq.name)
-            dat.append(d)
-            gt.append(g)
-        train_data = numpy.concatenate(dat)
-        train_gt3D = numpy.concatenate(gt)
-
-        mb = (train_data.nbytes) / (1024 * 1024)
-        print("data size: {}Mb".format(mb))
-
-        imgSizeW = train_data.shape[3]
-        imgSizeH = train_data.shape[2]
-        nChannels = train_data.shape[1]
-
-        hpe = ALEXHandposeEvaluation([i.gt3Dorig for i in Seq1_0.data], [i.gt3Dorig for i in Seq1_0.data])
-        hpe.subfolder += '/' + eval_prefix + '/'
-
-        hc = ALEXHandConstraints([Seq1_0.name])
-        return di, hc, trainSeqs, train_data, train_gt3D, imgSizeW, imgSizeH, nChannels, hpe
 
     print("create data")
     if dataset == "blender":
@@ -203,8 +175,6 @@ if __name__ == '__main__':
         di, hc, trainSeqs, train_data, train_gt3D, imgSizeW, imgSizeH, nChannels, hpe = import_nyu()
     elif dataset == "icvl":
         di, hc, trainSeqs, train_data, train_gt3D, imgSizeW, imgSizeH, nChannels, hpe = import_icvl()
-    elif dataset == "alex":
-        di, hc, trainSeqs, train_data, train_gt3D, imgSizeW, imgSizeH, nChannels, hpe = import_alex()
 
 
     # subset of all poses known, e.g. 10% labelled
@@ -264,8 +234,8 @@ if __name__ == '__main__':
     #   8236, 8254, 8258, 8264, 8288, 8293, 8298, 8302, 8306, 8312, 8336, 8350, 8394, 8403, 8405, 8409, 8417, 8419, 8421,
     #   8425, 8470, 8481, 8486, 8495]
     # blender ref framesgiffy
-    subset_idxs = [206, 259, 729, 919, 991, 1032, 1047, 1185, 1241, 1431, 1647, 1692, 1787, 1830,
-                   1849, 1888, 1967, 2008, 2091, 2251, 2351, 2545, 2588, 2801, 2824, 2893, 3001]
+    # subset_idxs = [206, 259, 729, 919, 991, 1032, 1047, 1185, 1241, 1431, 1647, 1692, 1787, 1830,
+    #                1849, 1888, 1967, 2008, 2091, 2251, 2351, 2545, 2588, 2801, 2824, 2893, 3001]
     # Refer to Example 20 as a better example
     # Our blender ref
     # subset_idxs = [16, 21, 26, 29, 45, 49, 52, 54, 58, 104, 108, 114, 138, 144, 148, 170, 175, 178, 210, 214, 217, 231, 237, 249, 252, 259, 264, 283, 287, 296, 307, 345, 370, 381, 384, 386, 405, 412, 423, 429, 436, 458, 465, 469, 490, 498, 505, 526, 530, 533, 537, 546, 553, 576, 607, 612, 624, 631, 657, 667, 669, 673, 685, 697, 704, 735, 742, 751, 765, 781, 784, 789, 793, 801, 805, 816, 820, 827, 830, 874, 886, 888, 893, 896, 899, 911, 923, 934, 962, 969, 983, 1023, 1027, 1029, 1034, 1046, 1054, 1057, 1070, 1075, 1085, 1093, 1098, 1110, 1114, 1134, 1138, 1146, 1173, 1181, 1184, 1188, 1191, 1194, 1208, 1213, 1221, 1224, 1228, 1241, 1248, 1251, 1255, 1262, 1267, 1274, 1286, 1295, 1308, 1312, 1335, 1341, 1349, 1353, 1383, 1386, 1389, 1410, 1414, 1422, 1432, 1449, 1452, 1455, 1465, 1473, 1477, 1489, 1504, 1523, 1532, 1542, 1550, 1552, 1571, 1580, 1586, 1591, 1609, 1613, 1617, 1628, 1632, 1644, 1653, 1656, 1688, 1694, 1695, 1698, 1709, 1713, 1725, 1745, 1752, 1756, 1762, 1772, 1778, 1795, 1812, 1814, 1817, 1830, 1833, 1848, 1853, 1858, 1864, 1869, 1873, 1887, 1892, 1897, 1904, 1927, 1930, 1934, 1937, 1965, 1973, 1978, 1991, 2017, 2028, 2033, 2048, 2055, 2058, 2067, 2074, 2094, 2131, 2137, 2146, 2150, 2166, 2170, 2177, 2185, 2191, 2196, 2203, 2208, 2213, 2222, 2255, 2269, 2273, 2288, 2291, 2298, 2305, 2325, 2331, 2334, 2339, 2343, 2347, 2351, 2372, 2380, 2390, 2394, 2416, 2428, 2434, 2462, 2468, 2484, 2497, 2504, 2509, 2511, 2515, 2529, 2543, 2566, 2572, 2584, 2590, 2609, 2617, 2627, 2631, 2644, 2651, 2654, 2661, 2685, 2687, 2693, 2702, 2737, 2749, 2754, 2763, 2775, 2778, 2790, 2792, 2808, 2813, 2816, 2820, 2829, 2835, 2852, 2856, 2872, 2891, 2898, 2905, 2911, 2942, 2945, 2949, 2952, 2989, 3011, 3015, 3031, 3034, 3037]
@@ -292,6 +262,11 @@ if __name__ == '__main__':
     #                             "3337 3745 3841 3848 3916 4145 4336 4492 4496 4553 4593 4672 4762 4899 4933 5039 5236 "
     #                             "5241 5311 5433 5536 5570 5584 5742 6094 6156 6208 6223 6331 6500 6592 6645 6683 6929 "
     #                             "6958 7121 7293 7338 7455 7632 7756 7774 7814 7952 8012 8242 8272 8302 8317 8340", sep=" ", dtype=int)
+
+    #this is a new implementation to calculate reference frames by VLM Giffy and Marnim.
+    reference_frame_calculator = find_reference_frames(eval_prefix)
+    subset_idxs = reference_frame_calculator.calculate_reference_frames()
+    del reference_frame_calculator
     def getSeqIdxForFlatIdx(i):
         nums = numpy.insert(numpy.cumsum(numpy.asarray([len(s.data) for s in trainSeqs])), 0, 0)
         d1 = nums - i
@@ -313,8 +288,8 @@ if __name__ == '__main__':
                    'init_manualrefinement': True,  # True, False
                    'init_offset': 'siftflow',
                    'init_fallback': False,  # True, False
-                   'init_incrementalref': True,  # True, False
-                   'init_refwithinsequence': False,  # True, False
+                   'init_incrementalref': False,  # True, False
+                   'init_refwithinsequence': True,  # True, False
                    'init_optimize_incHC': True,  # True, False
                    'init_accuracy_tresh': 10.,  # px
                    'ref_descriptor': 'hog',
@@ -425,8 +400,6 @@ if __name__ == '__main__':
         hpe = NYUHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], joints)
     elif dataset == "icvl":
         hpe = ICVLHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], joints)
-    elif dataset == "alex":
-        hpe = ALEXHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], joints)
     hpe.subfolder += '/'+eval_prefix+'/'
     print("Initialization:")
     print("Subset samples: {}".format(len(subset_idxs)))
@@ -442,8 +415,6 @@ if __name__ == '__main__':
         hpe_vis = NYUHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], joints)
     elif dataset == "icvl":
         hpe_vis = ICVLHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], joints)
-    elif dataset == "alex":
-        hpe_vis = ALEXHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], joints)
 
     hpe_vis.subfolder += '/'+eval_prefix+'/'
     hpe_vis.maskVisibility(numpy.repeat(li_visiblemask[:, :, None], 3, axis=2))
@@ -473,8 +444,6 @@ if __name__ == '__main__':
         hpe_ref = NYUHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], numpy.asarray(joints)[subset_idxs])
     elif dataset == "icvl":
         hpe_ref = ICVLHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], numpy.asarray(joints)[subset_idxs])
-    elif dataset == "alex":
-        hpe_ref = ALEXHandposeEvaluation(numpy.asarray(gt3D)[subset_idxs], numpy.asarray(joints)[subset_idxs])
     hpe_ref.subfolder += '/'+eval_prefix+'/'
     print("Reference samples: {}".format(len(subset_idxs)))
     print("Mean error: {}mm, max error: {}mm, median error: {}mm".format(hpe_ref.getMeanError(), hpe_ref.getMaxError(), hpe_ref.getMedianError()))
@@ -494,8 +463,6 @@ if __name__ == '__main__':
         hpe_init = NYUHandposeEvaluation(gt3D, joints)
     elif dataset == "icvl":
         hpe_init = ICVLHandposeEvaluation(gt3D, joints)
-    elif dataset == "alex":
-        hpe_init = ALEXHandposeEvaluation(gt3D, joints)
     hpe_init.subfolder += '/'+eval_prefix+'/'
     print("Train initialization: {}".format(train_data.shape[0]))
     print("Mean error: {}mm, max error: {}mm, median error: {}mm".format(hpe_init.getMeanError(), hpe_init.getMaxError(), hpe_init.getMedianError()))
@@ -514,8 +481,6 @@ if __name__ == '__main__':
         hpe_full = NYUHandposeEvaluation(gt3D, joints)
     elif dataset == "icvl":
         hpe_full = ICVLHandposeEvaluation(gt3D, joints)
-    elif dataset == "alex":
-        hpe_full = ALEXHandposeEvaluation(gt3D, joints)
 
     hpe_full.subfolder += '/'+eval_prefix+'/'
     print("Train samples: {}".format(train_data.shape[0]))

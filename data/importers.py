@@ -466,7 +466,7 @@ class Blender2Importer(DepthImporter):
     provide functionality to load data from the synthetic Blender dataset
     """
 
-    def __init__(self, basepath, useCache=True, cacheDir='./cache/'):
+    def __init__(self, basepath, useCache=True, cacheDir='./cache'):
         """
         Constructor
         :param basepath: base path of the MSRA dataset
