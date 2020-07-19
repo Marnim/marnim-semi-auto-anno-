@@ -27,6 +27,7 @@ from PyQt4.QtGui import QApplication
 from data.importers import Blender2Importer
 from util.handpose_evaluation import Blender2HandposeEvaluation
 from util.interactivedetector import InteractiveDetector
+from util.handdetector import HandDetector
 import sys
 
 __author__ = "Markus Oberweger <oberweger@icg.tugraz.at>"
@@ -79,34 +80,52 @@ if __name__ == '__main__':
             print("Invalid person name. Valid names are ",blender_persons)
             person = raw_input("Please enter one of the valid person names.").lower()
         di = Blender2Importer(data_folder+'/', useCache=True)
-        Seq2 = di.loadSequence(person, camera=0, shuffle=False)
-        hpe = Blender2HandposeEvaluation([j.gt3Dorig for j in Seq2.data], [j.gt3Dorig for j in Seq2.data])
-        for idx, seq in enumerate(Seq2.data):
-            Seq2.data[idx] = seq._replace(com=numpy.zeros((3,)))
+        # Seq2 = di.loadSequence(person, camera=0, shuffle=False)
+        # hpe = Blender2HandposeEvaluation([j.gt3Dorig for j in Seq2.data], [j.gt3Dorig for j in Seq2.data])
+        # for idx, seq in enumerate(Seq2.data):
+        #     Seq2.data[idx] = seq._replace(com=numpy.zeros((3,)))
+
+
     else:
         raise NotImplementedError("")
 
+    filenames = os.listdir(data_folder + "/" + person)
+    filenames.sort()
+    data = ""
+    for filename in filenames:
+        if filename.endswith(".npy"):
+            depth = di.loadDepthMap(data_folder + "/" + person + "/" + filename)
+            hd = HandDetector(depth, di.fx, di.fy, importer=di)
+            com = hd.calculateCoM(depth)
+            data += data_folder + "/" + person + "/" + filename + " " + str(com[0]) + " " + str(com[1]) + " " + str(
+                com[2]) + "\n"
+    detection = open(data_folder + "/" + person + "/detections.txt", "w+")
+    detection.write(data)
+    detection.close()
+
     # we need to detect all files
-    subset_idxs = []
+    # subset_idxs = []
+    #
+    # output_path = di.basepath
+    #
+    # filename_dets = output_path+person+'/detections.txt'
+    # filename_log = output_path+person+'/detecttool_log.txt'
+    #
+    # # create empty file
+    # if not os.path.exists(filename_dets):
+    #     annoFile = open(filename_dets, "w")
+    #     annoFile.close()
+    # else:
+    #     bak = filename_dets+'.bak'
+    #     i = 0
+    #     while os.path.exists(bak):
+    #         bak = filename_dets+'.bak.{}'.format(i)
+    #         i += 1
+    #     os.popen('cp '+filename_dets+' '+bak)
 
-    output_path = di.basepath
+    # app = QApplication(sys.argv)
+    # browser = InteractiveDetector(Seq2, hpe, di, filename_dets, filename_log, subset_idxs, start_idx)
+    # browser.show()
+    # app.exec_()
 
-    filename_dets = output_path+person+'/detections.txt'
-    filename_log = output_path+person+'/detecttool_log.txt'
 
-    # create empty file
-    if not os.path.exists(filename_dets):
-        annoFile = open(filename_dets, "w")
-        annoFile.close()
-    else:
-        bak = filename_dets+'.bak'
-        i = 0
-        while os.path.exists(bak):
-            bak = filename_dets+'.bak.{}'.format(i)
-            i += 1
-        os.popen('cp '+filename_dets+' '+bak)
-
-    app = QApplication(sys.argv)
-    browser = InteractiveDetector(Seq2, hpe, di, filename_dets, filename_log, subset_idxs, start_idx)
-    browser.show()
-    app.exec_()

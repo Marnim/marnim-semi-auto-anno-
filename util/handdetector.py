@@ -298,7 +298,7 @@ class HandDetector(object):
 
         return ret
 
-    def cropArea3D(self, com=None, size=(250, 250, 250), dsize=(128, 128), docom=False):
+    def cropArea3D(self, com=None, size=(250, 250, 250), dsize=(128, 128), docom=False, detect = False):
         """
         Crop area of hand in 3D volumina, scales inverse to the distance of hand to camera
         :param com: center of mass, in image coordinates (x,y,z), z in mm

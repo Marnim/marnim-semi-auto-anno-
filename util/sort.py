@@ -10,18 +10,11 @@ class find_reference_frames:
         self.dist_func = dist_func
         self.distance_threshold = distance_threshold
         self.force = force
-    def calculate_reference_frames(self):
+    def calculate_reference_frames(self, train_data):
         ref_array_file = "ref_array.npy"
         if not os.path.isfile(self.eval_folder+ref_array_file) or self.force:
-            pickleCache = 'cache/Blender2Importer_hpseq_loop_mv_0_cache.pkl'
-            f = open(pickleCache, 'rb')
-            (seqName, data, config) = pickle.load(f)
-            f.close()
-            image_data = np.zeros((len(data),128,128))
-            for i, img in enumerate(data):
-                image_data[i] += img.dpt
-            dst = pairwise_distances(image_data.reshape(image_data.shape[0],-1), metric=self.dist_func).reshape(image_data.shape[0], image_data.shape[0])
-            sort_array = np.ones(image_data.shape[0], dtype=int) * -1
+            dst = pairwise_distances(train_data.reshape(train_data.shape[0],-1), metric=self.dist_func).reshape(train_data.shape[0], train_data.shape[0])
+            sort_array = np.ones(train_data.shape[0], dtype=int) * -1
             sort_array[0] = 0
             dst[:,0] = np.inf
             min_distance = []

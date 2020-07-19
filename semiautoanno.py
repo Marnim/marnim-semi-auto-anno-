@@ -37,6 +37,8 @@ from sklearn.metrics.pairwise import pairwise_distances
 from util.helpers import gaussian_kernel
 from util.optimize import sparseLM
 from util.cluster import submodularClusterGreedy
+import matlab.engine
+from scipy.spatial import distance
 
 __author__ = "Markus Oberweger <oberweger@icg.tugraz.at>"
 __copyright__ = "Copyright 2016, ICG, Graz University of Technology, Austria"
@@ -76,6 +78,8 @@ class SemiAutoAnno:
 
         self.eval_prefix = eval_prefix
         self.eval_params = eval_params
+        self.eng = matlab.engine.start_matlab()
+        self.eng.addpath("./etc/sift_flow")
         if 'optimize_Ri' in self.eval_params:
             self.optimize_Ri = self.eval_params['optimize_Ri']
         else:
@@ -236,8 +240,9 @@ class SemiAutoAnno:
                 thefile.write("{}\n".format(depth_files[item]))
             thefile.close()
             raise UserWarning("Rerun with given set of reference frames!")
-        self.numSubset = len(subset_idxs)
         self.subset_idxs = numpy.asarray(subset_idxs)
+        self.numSubset = len(self.subset_idxs)
+
 
         if li_visiblemask is None:
             # zero means: optimize me or not visible
@@ -496,6 +501,8 @@ class SemiAutoAnno:
         import matplotlib.pyplot as plt
         import theano
         import theano.tensor as T
+        # theano.config.exception_verbosity = 'high'
+        # theano.config.init_gpu_device = 'cuda0'
 
         if LiInit is None:
             Li = self.rng.randn(self.numSamples, self.numJoints * 3) * 0.01
@@ -586,6 +593,7 @@ class SemiAutoAnno:
         if self.isli2D:
             # 3D -> 2D projection also shift by M to cropped window
             Li_subset = tsLi[self.subset_idxs]
+            self.numSubset = len(self.subset_idxs)
             Li_subset_glob3D = (T.reshape(Li_subset, (self.numSubset, self.numJoints, 3))*tsScale[self.subset_idxs].dimshuffle(0, 'x', 'x')+tsOff3D[self.subset_idxs].dimshuffle(0, 'x', 1)).reshape((self.numSubset*self.numJoints, 3))
             Li_subset_glob3D_hom = T.concatenate([Li_subset_glob3D, T.ones((self.numSubset*self.numJoints, 1), dtype='float32')], axis=1)
             Li_subset_glob2D_hom = T.dot(Li_subset_glob3D_hom, tsCam.T)
@@ -721,17 +729,20 @@ class SemiAutoAnno:
         s = 0
 
         if 'global_corr_ref' in self.eval_params:
-            if self.useCache and os.path.isfile("{}/Li_init_corr_maps.npz".format(self.eval_prefix)):
-                corrMaps_k, corrMaps_kp1 = numpy.load("{}/Li_init_corr_maps.npz".format(self.eval_prefix))
-            elif self.eval_params['global_corr_ref'] == 'closest':
+            if self.eval_params['global_corr_ref'] == 'closest':
                 if self.isli2D:
                     li_denorm = self.li*(self.Di.shape[3]/2.)+(self.Di.shape[3]/2.)
                 else:
                     li_denorm = self.project3Dto2D(self.li, self.subset_idxs)*(self.Di.shape[3]/2.)+(self.Di.shape[3]/2.)
                 # iterate all images in current sequence
-                for i in xrange(self.numSamples):
+                frames_sort_array = numpy.load(self.eval_prefix + "/sort_array.npy")
+                for i in range(frames_sort_array.shape[0]):
                     pbar.update(i)
-                    ref_idx, _, _ = self.getReferenceForSample(i, Li, doOffset=False)
+                    if i==0:
+                        ref_idx = frames_sort_array[i]
+                    else:
+                        ref_idx = frames_sort_array[i-1]
+                    # ref_idx, _, _ = self.getReferenceForSample(frames_sort_array[i], i, ref_idx)
                     li_idx = numpy.where(numpy.asarray(self.subset_idxs) == ref_idx)[0][0]
 
                     weights_k[i] = 1.
@@ -794,12 +805,6 @@ class SemiAutoAnno:
                 raise NotImplementedError("Unknown parameter: "+self.eval_params['global_corr_ref'])
         else:
             raise NotImplementedError("Missing parameter 'global_corr_ref'")
-
-
-        numpy.savez("{}/Li_init_{}_corr_maps_{}.npz".format(self.eval_prefix,
-                                                            self.eval_params['init_method'],
-                                                            self.eval_params['init_offset'])
-                    , corrMaps_k, corrMaps_kp1)
         pbar.finish()
 
         allcosts = []
@@ -2047,17 +2052,19 @@ class SemiAutoAnno:
             raise NotImplementedError("!")
         else:
             # quick and dirty call of matlab script
-            scipy.io.savemat("./etc/sift_flow/input_{}.mat".format(os.getpid()),
-                             {'in1': self.Di[ref_idx, 0], 'in2': self.Di[idx, 0]})
-            cmd = "-nojvm -nodisplay -nosplash -r \"cd ./etc/sift_flow/; procid={}; try, run('process.m'); end; quit \" ".format(os.getpid())
-
-            from subprocess import call
-            call(["matlab", cmd])
-            data = scipy.io.loadmat("./etc/sift_flow/output_{}.mat".format(os.getpid()))
-            flow = data['flow'].astype('float')
+            # scipy.io.savemat("./etc/sift_flow/input_{}.mat".format(os.getpid()),
+            #                  {'in1': self.Di[ref_idx, 0], 'in2': self.Di[idx, 0]})
+            # cmd = "-nojvm -nodisplay -nosplash -r \"cd ./etc/sift_flow/; procid={}; try, run('process.m'); end; quit \" ".format(os.getpid())
+            #
+            # from subprocess import call
+            # call(["matlab", cmd])
+            # data = scipy.io.loadmat("./etc/sift_flow/output_{}.mat".format(os.getpid()))
+            flow, warpI2 = self.eng.process(self.Di[ref_idx, 0].flatten().tolist(), self.Di[idx, 0].flatten().tolist(), "./etc/sift_flow/", nargout=2)
+            # flow = data['flow'].astype('float')
+            flow, warpI2 = numpy.asarray(flow), numpy.asarray(warpI2)
             vx = flow[:, :, 0]
             vy = flow[:, :, 1]
-            warpI2 = data['warpI2']
+            # warpI2 = data['warpI2']
 
         # find closest offset vector from siftflow an shift 2D annoataion by this amount
         off = numpy.zeros((self.numJoints, 2))
@@ -2154,7 +2161,7 @@ class SemiAutoAnno:
             else:
                 img *= self.Di_scale[i]
                 img += self.Di_scale[i]
-            img = cv2.normalize(img, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+            img = cv2.normalize(img, img, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
             descr[i] = hog.compute(img.astype('uint8'))[:, 0]
 
             if useMask:
@@ -2316,7 +2323,18 @@ class SemiAutoAnno:
         corrected = []
         start = time.time()
         frames_sort_array = numpy.load(self.eval_prefix+"/sort_array.npy")
-        for isa in frames_sort_array:
+        for frame_index in range(1,frames_sort_array.shape[0]):
+            if frames_sort_array[frame_index] in self.subset_idxs:
+                continue
+            dst = distance.cosine(self.Di[frames_sort_array[frame_index-1]].flatten(), self.Di[frames_sort_array[frame_index]].flatten())
+            if dst == 0:
+                init[frames_sort_array[frame_index]] = init[frames_sort_array[frame_index-1]]
+                self.subset_idxs = numpy.append(self.subset_idxs, frames_sort_array[frame_index])
+                self.li3D_aug = numpy.vstack((self.li3D_aug, init[frames_sort_array[frame_index]].reshape(1, self.numJoints, 3)))
+                self.li = numpy.vstack((self.li, self.project3Dto2D(init[frames_sort_array[frame_index]], frames_sort_array[frame_index]).reshape(1, self.numJoints * 2)))
+                self.addPBVisForLi(frames_sort_array[frame_index])
+                unannotated = numpy.setdiff1d(numpy.arange(self.numSamples), self.subset_idxs, assume_unique=True)
+                continue
 
             if init_aligned_cache is False:
                 if 'init_incrementalref' in self.eval_params:
@@ -2330,12 +2348,12 @@ class SemiAutoAnno:
                         assert i not in self.subset_idxs
                     else:
                         print "Unannotated frames: {}".format(frames_sort_array.shape[0] - len(self.subset_idxs))
-                        if isa in self.subset_idxs:
-                            ref_idx = isa
+                        if frames_sort_array[frame_index] in self.subset_idxs:
+                            ref_idx = frames_sort_array[frame_index]
                         else:
-                            ref_idx = frames_sort_array[numpy.where(frames_sort_array == isa)[0]-1]
-                        off2D, off3D = self.getReferenceForSample(isa, init, ref_idx)
-                        i = isa
+                            ref_idx = frames_sort_array[frame_index-1]
+                        off2D, off3D = self.getReferenceForSample(frames_sort_array[frame_index], init, ref_idx)
+                        i = frames_sort_array[frame_index]
                 else:
                     raise NotImplementedError("Missing parameter 'init_incrementalref'")
 
@@ -2362,7 +2380,7 @@ class SemiAutoAnno:
                     x0 = init[ref_idx].flatten()
                 #np.save()
             else:
-                i = isa
+                i = frames_sort_array[frame_index]
                 ref_idx = int(init_aligned[i, 0, 0])
                 x0 = init_aligned[i, 1:, :]
 
@@ -2395,7 +2413,7 @@ class SemiAutoAnno:
                 # create template patches and pad them
                 templ_k = self.Di[ref_idx, 0, max(ystart_k, 0):min(yend_k, self.Di.shape[2]),
                                   max(xstart_k, 0):min(xend_k, self.Di.shape[3])].copy()
-                templ_k = numpy.pad(templ_k.reshape(templ_k.shape[1], templ_k.shape[2]), ((abs(ystart_k)-max(ystart_k, 0), abs(yend_k)-min(yend_k, self.Di.shape[2])),
+                templ_k = numpy.pad(templ_k.reshape(templ_k.shape[0], templ_k.shape[1]), ((abs(ystart_k)-max(ystart_k, 0), abs(yend_k)-min(yend_k, self.Di.shape[2])),
                                               (abs(xstart_k)-max(xstart_k, 0), abs(xend_k)-min(xend_k, self.Di.shape[3]))),
                                     mode='constant', constant_values=(1.,))
 
@@ -2404,13 +2422,13 @@ class SemiAutoAnno:
                 msk = scipy.ndimage.binary_erosion(msk, structure=numpy.ones((3, 3)), iterations=1)
                 msk_dt = numpy.bitwise_not(msk)
                 edt = scipy.ndimage.morphology.distance_transform_edt(msk_dt)
-                edt = cv2.normalize(edt, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+                edt = cv2.normalize(edt, edt, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
                 # normalized correlation maps
                 di_pad = numpy.pad(self.Di[i, 0].astype('float32'), ((self.corrPatchSize // 2, self.corrPatchSize // 2-1),
                                                                      (self.corrPatchSize // 2, self.corrPatchSize // 2-1)),
                                    mode='constant', constant_values=(1.,))
                 corrMaps_k[0, j] = cv2.matchTemplate(di_pad, templ_k.astype('float32'), self.corrMethod)
-                corrMaps_k[0, j] = cv2.normalize(corrMaps_k[0, j], alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+                corrMaps_k[0, j] = cv2.normalize(corrMaps_k[0, j], corrMaps_k[0, j], alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
                 corrMaps_k[0, j] *= msk.astype(corrMaps_k.dtype)
                 # correlation is high where similar, we minimize dissimilarity which is 1-corr
                 corrMaps_k[0, j] = 1. - corrMaps_k[0, j] + numpy.square(edt + 1.)*msk_dt.astype(corrMaps_k.dtype)
@@ -2605,7 +2623,7 @@ class SemiAutoAnno:
             # else:
             #     raise NotImplementedError("Missing parameter 'init_incrementalref'")
 
-            pbar.update(isa)
+            pbar.update(frames_sort_array[frame_index])
 
             # show initialization
             if self.debugPrint:
@@ -2662,7 +2680,9 @@ class SemiAutoAnno:
                 #                  niceColors=True)
 
         pbar.finish()
-
+        del frames_sort_array
+        gc.collect()
+        gc.collect()
         print "Took {}s for init closest reference".format(time.time()-start)
 
         # save intermediary results

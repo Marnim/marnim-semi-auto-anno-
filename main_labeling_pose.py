@@ -99,7 +99,7 @@ if __name__ == '__main__':
 
         # common subset for all
         frf = find_reference_frames(eval_folder)
-        subset_idxs = frf.calculate_reference_frames()
+        subset_idxs = list(frf.calculate_reference_frames())
         del frf
     else:
         raise NotImplementedError("")

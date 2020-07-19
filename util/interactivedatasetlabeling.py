@@ -117,7 +117,7 @@ class InteractiveDatasetLabeling(QMainWindow):
                 dat = data[self.curFrame-self.replace_off].reshape(self._seq.data[self.curFrame].gtorig.shape)*self._seq.config['cube'][2]/2.+self._seq.data[self.curFrame].com
             self.curData = self.importer.joints3DToImg(dat)
         else:
-            if ~numpy.allclose(self._seq.data[self.curFrame].gtorig, 0.):
+            if not numpy.allclose(self._seq.data[self.curFrame].gtorig, 0.):
                 self.curData = self._seq.data[self.curFrame].gtorig.copy()
             else:
                 self.curData = self.importer.default_gtorig.copy() + self.importer.joint3DToImg(self._seq.data[self.curFrame].com)

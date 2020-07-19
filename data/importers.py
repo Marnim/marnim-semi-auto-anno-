@@ -31,7 +31,6 @@ from PIL import Image
 import glob
 import os
 
-import cv2
 import progressbar as pb
 import struct
 from basetypes import DepthFrame, NamedImgSequence
@@ -352,7 +351,7 @@ class DepthImporter(object):
         """
 
         pose = np.zeros_like(self.default_gtorig)
-        if cache_str != '':
+        if len(cache_str) != 0:
             count = 0
             for line in cache_str:
                 part = line.strip().split(' ')
@@ -387,7 +386,7 @@ class DepthImporter(object):
 
         vis = []
 
-        if cache_str != '':
+        if len(cache_str) != 0:
             count = 0
             for line in cache_str:
                 part = line.strip().split(' ')
@@ -420,13 +419,13 @@ class DepthImporter(object):
         pbp = []
         pbi = []
 
-        if cache_str != '':
+        if len(cache_str) > 1:
             count = 0
-            for line in cache_str:
+            for line in cache_str[1:]:
                 part = line.strip().split(' ')
                 if isinstance(name, basestring) and os.path.normpath(part[0]).split(os.path.sep)[-1] == os.path.normpath(name).split(os.path.sep)[-1] and os.path.normpath(part[0]).split(os.path.sep)[-2] == os.path.normpath(name).split(os.path.sep)[-2]:
-                    part = part[1:]
-                    assert len(part) % 4 == 0
+                    # part = part[0:]
+                    assert len(part) == 1 or len(part[1:]) % 4 == 0
                     # posebits are saved as id1 id2 id1 id2 or id1 id2 id2 id1
                     for k in xrange(len(part)//4):
                         pbp.append((int(part[k*4+0]), int(part[k*4+1])))
@@ -506,7 +505,6 @@ class Blender2Importer(DepthImporter):
         else:
             raise IOError("Invalid file: {}".format(filename))
         depth[depth > 1000. - 1e-4] = 32001
-
         # return in mm
         return depth
 

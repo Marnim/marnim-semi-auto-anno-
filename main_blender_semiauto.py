@@ -50,7 +50,7 @@ if __name__ == '__main__':
     di = hc = trainSeqs = train_data = train_gt3D = imgSizeW = imgSizeH = nChannels = hpe = None
 
     def import_blender():
-        di = Blender2Importer(data_folder)
+        di = Blender2Importer(data_folder, useCache=True)
         Seq1_0 = di.loadSequence('hpseq_loop_mv', camera=0, shuffle=False)
         trainSeqs = [Seq1_0]
 
@@ -264,8 +264,9 @@ if __name__ == '__main__':
     #                             "6958 7121 7293 7338 7455 7632 7756 7774 7814 7952 8012 8242 8272 8302 8317 8340", sep=" ", dtype=int)
 
     #this is a new implementation to calculate reference frames by VLM Giffy and Marnim.
-    reference_frame_calculator = find_reference_frames(eval_prefix)
-    subset_idxs = reference_frame_calculator.calculate_reference_frames()
+    reference_frame_calculator = find_reference_frames(eval_prefix, force=True, distance_threshold=0.12)
+    subset_idxs = reference_frame_calculator.calculate_reference_frames(train_data)
+    print (len(subset_idxs))
     del reference_frame_calculator
     def getSeqIdxForFlatIdx(i):
         nums = numpy.insert(numpy.cumsum(numpy.asarray([len(s.data) for s in trainSeqs])), 0, 0)

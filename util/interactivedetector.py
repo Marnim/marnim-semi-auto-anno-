@@ -61,7 +61,7 @@ class InteractiveDetector(QMainWindow):
         super(InteractiveDetector, self).__init__(parent)
         self.setWindowTitle('Detection Tool')
         self.dpi = 100
-        self.panned = False
+        self.panned = False # was originally False
         self.lastind = 0
         self._ind = None
         self.epsilon = 15

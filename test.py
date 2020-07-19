@@ -1,23 +1,43 @@
-from theano import function, config, shared, tensor
-import numpy
+import numpy as np
+from scipy.spatial import distance
+import pickle
+import matplotlib.pyplot as plt
+import matlab.engine
 import time
 
-vlen = 10 * 30 * 768  # 10 x #cores x # threads per core
-iters = 1000
+pickleCache = 'cache/Blender2Importer_hpseq_loop_mv_0_cache.pkl'
+eng = matlab.engine.start_matlab()
+start_time = time.time()
+tf = eng.isprime(37)
+print("--- %s seconds ---" % (time.time() - start_time))
+print(tf)
+f = open(pickleCache, 'rb')
+(seqName, data, config) = pickle.load(f)
+f.close()
+image_data = np.zeros((len(data),128,128))
+joints_2d_crop = np.zeros((len(data),24,3))
+joints_3d_crop = np.zeros((len(data), 24, 3))
+for i, img in enumerate(data):
+    image_data[i] += img.dpt
+    joints_2d_crop[i]+=img.gtcrop
+    joints_3d_crop[i]+=img.gt3Dcrop
 
-rng = numpy.random.RandomState(22)
-x = shared(numpy.asarray(rng.rand(vlen), config.floatX))
-f = function([], tensor.exp(x))
-print(f.maker.fgraph.toposort())
-t0 = time.time()
-for i in range(iters):
-    r = f()
-t1 = time.time()
-print("Looping %d times took %f seconds" % (iters, t1 - t0))
-print("Result is %s" % (r,))
-if numpy.any([isinstance(x.op, tensor.Elemwise) and
-              ('Gpu' not in type(x.op).__name__)
-              for x in f.maker.fgraph.toposort()]):
-    print('Used the cpu')
-else:
-    print('Used the gpu')
+sort_array = np.load("eval/blender/sort_array.npy")
+ref_frames = np.load("eval/blender/ref_array.npy")
+new_joints = {0:joints_2d_crop[0]}
+ref = 0
+for i in range(sort_array.shape[0]-1):
+    dst = distance.cosine(image_data[sort_array[i]].flatten(), image_data[sort_array[i+1]].flatten())
+    if dst == 0:
+        new_joints[i+1] = new_joints[i]
+    else:
+        plt.imshow(image_data[sort_array[i]])
+        plt.show()
+        plt.imshow(image_data[sort_array[i+1]])
+        plt.show()
+        break
+
+
+
+
+
