@@ -36,8 +36,9 @@ from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
 
 __author__ = "Markus Oberweger <oberweger@icg.tugraz.at>"
@@ -216,13 +217,13 @@ class InteractiveDatasetLabeling(QMainWindow):
         hbox_pb_controls = QHBoxLayout()
 
         self.prevButton = QPushButton('Previous', self.main_frame)
-        self.connect(self.prevButton, SIGNAL('clicked()'), self.prevButton_callback)
+        self.prevButton.clicked.connect(self.prevButton_callback)
         hbox_pb_controls.addWidget(self.prevButton)
 
         for w in range(len(self.hc.posebits)):
             self.cb_pb.append(QCheckBox(str(self.hc.posebits[w]), self.main_frame))
             self.cb_pb[-1].setChecked(False)
-            self.connect(self.cb_pb[-1], SIGNAL('stateChanged(int)'), self.cb_pb_changed_callback)
+            self.cb_pb[-1].stateChanged.connect(self.cb_pb_changed_callback)
 
             vbox = QVBoxLayout()
             vbox.addWidget(self.cb_pb[-1])
@@ -230,11 +231,11 @@ class InteractiveDatasetLabeling(QMainWindow):
             # Number group
             r_group = QButtonGroup()
             r0 = QRadioButton("{} < {}".format(self.hc.posebits[w][0], self.hc.posebits[w][1]), self.main_frame)
-            self.connect(r0, SIGNAL('toggled(bool)'), self.rb_pb_changed_callback)
+            r0.toggled.connect(self.rb_pb_changed_callback)
             r0.setChecked(True)
             r_group.addButton(r0)
             r1 = QRadioButton("{} < {}".format(self.hc.posebits[w][1], self.hc.posebits[w][0]), self.main_frame)
-            self.connect(r1, SIGNAL('toggled(bool)'), self.rb_pb_changed_callback)
+            r1.toggled.connect(self.rb_pb_changed_callback)
             r_group.addButton(r1)
             vbox.addWidget(r0)
             vbox.addWidget(r1)
@@ -245,9 +246,9 @@ class InteractiveDatasetLabeling(QMainWindow):
 
         vbox_right = QVBoxLayout()
         self.solveButton = QPushButton('Solve', self.main_frame)
-        self.connect(self.solveButton, SIGNAL('clicked()'), self.solveButton_callback)
+        self.solveButton.clicked.connect(self.solveButton_callback)
         self.nextButton = QPushButton('Next', self.main_frame)
-        self.connect(self.nextButton, SIGNAL('clicked()'), self.nextButton_callback)
+        self.nextButton.clicked.connect( self.nextButton_callback)
         vbox_right.addWidget(self.solveButton)
         vbox_right.addWidget(self.nextButton)
         hbox_pb_controls.addLayout(vbox_right)

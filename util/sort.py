@@ -38,6 +38,8 @@ class find_reference_frames:
                 if min_distance[i] > self.distance_threshold:
                     ref_frames.append(sort_array[prev])
                     prev = i
+            if not os.path.exists(self.eval_folder):
+                os.mkdir(self.eval_folder)
             np.save(self.eval_folder+ref_array_file, ref_frames)
             np.save(self.eval_folder+"sort_array", sort_array)
         else:

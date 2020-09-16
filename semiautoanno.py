@@ -501,7 +501,7 @@ class SemiAutoAnno:
         import matplotlib.pyplot as plt
         import theano
         import theano.tensor as T
-        # theano.config.exception_verbosity = 'high'
+        theano.config.exception_verbosity = 'high'
         # theano.config.init_gpu_device = 'cuda0'
 
         if LiInit is None:
@@ -1482,6 +1482,7 @@ class SemiAutoAnno:
 
         import theano
         import theano.tensor as T
+        theano.config.exception_verbosity = 'high'
 
         if not isinstance(idxs, numpy.ndarray):
             idxs = numpy.asarray([idxs])
@@ -1531,6 +1532,9 @@ class SemiAutoAnno:
             eq = theano.shared(numpy.cast['float32'](0.), name='dummy', borrow=True)
 
         costP += tsMuLagr/len(self.lenghtConstraintIdx)*T.sum(T.sqr(eq))
+
+        temp_joints = T.reshape(tsLi, (self.numJoints, 3))
+
 
         # constraint with bounded joint length
         if len(self.boundConstraintIdx) > 0:
@@ -1589,6 +1593,74 @@ class SemiAutoAnno:
             else:
                 ieq = T.concatenate([ieq, zzerr.flatten()], axis=0)
 
+        # temp_joints = T.reshape(tsLi, (self.numJoints, 3))
+        mcps = self.hc.joint_dict["mcp"]
+        op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_mcp', borrow=True)
+        for mcp in mcps:
+            a = temp_joints[mcp[1]] - temp_joints[mcp[0]]
+            b = temp_joints[mcp[2]] - temp_joints[mcp[1]]
+            x = T.dot(a, b)
+            den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
+            op1 = T.set_subtensor(op1[mcp[1]], 90 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
+        if ieq is None:
+            ieq = op1.flatten()
+        else:
+            ieq = T.concatenate([ieq, op1.flatten()], axis=0)
+
+        pips = self.hc.joint_dict["pip"]
+        op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_pip', borrow=True)
+        for pip in pips:
+            a = temp_joints[pip[1]] - temp_joints[pip[0]]
+            b = temp_joints[pip[2]] - temp_joints[pip[1]]
+            x = T.dot(a, b)
+            den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
+            op1 = T.set_subtensor(op1[pip[1]], 110 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
+        if ieq is None:
+            ieq = op1.flatten()
+        else:
+            ieq = T.concatenate([ieq, op1.flatten()], axis=0)
+
+        dips = self.hc.joint_dict["dip"]
+        op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_dip', borrow=True)
+        for dip in dips:
+            a = temp_joints[dip[1]] - temp_joints[dip[0]]
+            b = temp_joints[dip[2]] - temp_joints[dip[1]]
+            x = T.dot(a, b)
+            den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
+            op1 = T.set_subtensor(op1[dip[1]], 90 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
+        if ieq is None:
+            ieq = op1.flatten()
+        else:
+            ieq = T.concatenate([ieq, op1.flatten()], axis=0)
+
+        # op1 = theano.shared(numpy.zeros(self.numJoints), name='coplanar1', borrow=True)
+        # op2 = theano.shared(numpy.zeros(self.numJoints), name='coplanar2', borrow=True)
+        # for i in self.hc.finger_tips:
+        #     x1 = temp_joints[i - 2, 0] - temp_joints[i - 3, 0]
+        #     y1 = temp_joints[i - 2, 1] - temp_joints[i - 3, 1]
+        #     z1 = temp_joints[i - 2, 2] - temp_joints[i - 3, 2]
+        #
+        #     x2 = temp_joints[i, 0] - temp_joints[i - 3, 0]
+        #     y2 = temp_joints[i, 1] - temp_joints[i - 3, 1]
+        #     z2 = temp_joints[i, 2] - temp_joints[i - 3, 2]
+        #
+        #     x = y1 * z2 - y2 * z1
+        #     y = x2 * z1 - x1 * z2
+        #     z = x1 * y2 - y1 * x2
+        #     d = -x * temp_joints[i - 3, 0] - y * temp_joints[i - 3, 1] - z * temp_joints[i - 3, 2]
+        #
+        #     op1 = T.set_subtensor(op1[i - 1],
+        #                          0.15 - (x * temp_joints[i - 1, 0] + y * temp_joints[i - 1, 1] + z * temp_joints[i - 1, 2] + d))
+        #     op2 = T.set_subtensor(op2[i - 1],
+        #                           (x * temp_joints[i - 1, 0] + y * temp_joints[i - 1, 1] + z * temp_joints[i - 1, 2] + d)+0.15)
+        #
+        # if ieq is None:
+        #     ieq = op1.flatten()
+        #     ieq = T.concatenate([ieq, op2.flatten()], axis = 0)
+        # else:
+        #     ieq = T.concatenate([ieq, op1.flatten()], axis=0)
+        #     ieq = T.concatenate([ieq, op2.flatten()], axis=0)
+
         print "compiling functions..."
         givens = []
         fun_cost = theano.function([], costP, givens=givens, mode='FAST_RUN', on_unused_input='warn')
@@ -1596,11 +1668,11 @@ class SemiAutoAnno:
         grad_cost = T.grad(costP, tsLi)
         gf_cost = theano.function([], grad_cost, givens=givens, mode='FAST_RUN', on_unused_input='warn')
 
-        fun_eq_constr = theano.function([], eq, givens=givens, mode='FAST_RUN', on_unused_input='warn')
+        # fun_eq_constr = theano.function([], op, givens=givens, mode='FAST_RUN', on_unused_input='warn')
 
         idx = T.lscalar('idx')
-        grad_eq_constr = T.grad(eq[idx], tsLi)
-        gf_eq_constr = theano.function([idx], grad_eq_constr, givens=givens, mode='FAST_RUN', on_unused_input='warn')
+        # grad_eq_constr = T.grad(op[idx], tsLi)
+        # gf_eq_constr = theano.function([idx], grad_eq_constr, givens=givens, mode='FAST_RUN', on_unused_input='warn')
 
         fun_ieq_constr = theano.function([], ieq, givens=givens, mode='FAST_RUN', on_unused_input='warn')
 
@@ -1619,17 +1691,17 @@ class SemiAutoAnno:
             return numpy.asarray(gf_cost()).flatten().astype(float)
 
         # creates a function that computes the equality cost
-        def eq_constr_fn(x, ref_tsLi):
-            ref_tsLi.set_value(x.reshape(li3D[0].shape).astype('float32'))
-            return numpy.asarray(fun_eq_constr()).flatten().astype(float)
+        # def eq_constr_fn(x, ref_tsLi):
+        #     ref_tsLi.set_value(x.reshape(li3D[0].shape).astype('float32'))
+        #     return numpy.asarray(fun_eq_constr()).flatten().astype(float)
 
         # creates a function that computes the gradient of equality cost
-        def eq_constr_fn_grad(x, ref_tsLi):
-            arr = numpy.zeros((len(self.lenghtConstraintIdx), x.size))
-            ref_tsLi.set_value(x.reshape(li3D[0].shape).astype('float32'))
-            for ii in range(len(self.lenghtConstraintIdx)):
-                arr[ii] = numpy.asarray(gf_eq_constr(ii)).flatten()
-            return arr.astype(float)
+        # def eq_constr_fn_grad(x, ref_tsLi):
+        #     arr = numpy.zeros((len(self.lenghtConstraintIdx), x.size))
+        #     ref_tsLi.set_value(x.reshape(li3D[0].shape).astype('float32'))
+        #     for ii in range(len(self.lenghtConstraintIdx)):
+        #         arr[ii] = numpy.asarray(gf_eq_constr(ii)).flatten()
+        #     return arr.astype(float)
 
         # creates a function that computes the equality cost
         def ieq_constr_fn(x, ref_tsLi):
@@ -2060,6 +2132,8 @@ class SemiAutoAnno:
             # call(["matlab", cmd])
             # data = scipy.io.loadmat("./etc/sift_flow/output_{}.mat".format(os.getpid()))
             flow, warpI2 = self.eng.process(self.Di[ref_idx, 0].flatten().tolist(), self.Di[idx, 0].flatten().tolist(), "./etc/sift_flow/", nargout=2)
+            self.eng.eval('exception = MException.last;', nargout=0)
+            self.eng.eval('getReport(exception)')
             # flow = data['flow'].astype('float')
             flow, warpI2 = numpy.asarray(flow), numpy.asarray(warpI2)
             vx = flow[:, :, 0]

@@ -264,7 +264,8 @@ if __name__ == '__main__':
     #                             "6958 7121 7293 7338 7455 7632 7756 7774 7814 7952 8012 8242 8272 8302 8317 8340", sep=" ", dtype=int)
 
     #this is a new implementation to calculate reference frames by VLM Giffy and Marnim.
-    reference_frame_calculator = find_reference_frames(eval_prefix, force=True, distance_threshold=0.12)
+    reference_frame_calculator = find_reference_frames(eval_prefix, force=True, distance_threshold=45, dist_func='euclidean')
+    # reference_frame_calculator = find_reference_frames(eval_prefix, force=True, distance_threshold=28, dist_func='euclidean')
     subset_idxs = reference_frame_calculator.calculate_reference_frames(train_data)
     print (len(subset_idxs))
     del reference_frame_calculator
@@ -507,23 +508,6 @@ if __name__ == '__main__':
             jtI[joint,0] = t[0]
             jtI[joint,1] = t[1]
 
-        # if ind <= 5:
-        #     print '##################'
-        #     print 'jtI', jtI
-        #     print 'original_joints', original_joints
-        #     #print jtI[:, 0], original_joints[:, 0]
-        #     #sq = 0
-        #     #for k in range(jt.shape[0]):
-        #     #    print sq
-        #     print jtI[:, 0] - original_joints[:, 0]
-        #     print jtI[:, 1] - original_joints[:, 1]
-        #     print jtI[:, 2] - original_joints[:, 2]
-        #     sq = np.sqrt((jtI[:,0] - original_joints[:,0]) ** 2 +(jtI[:,1] - original_joints[:,1]) ** 2 )
-        #     sq3 = np.sqrt((jtI[:, 0] - original_joints[:, 0]) ** 2 + (jtI[:, 1] - original_joints[:, 1]) ** 2 + (jtI[:, 2] - original_joints[:, 2]) ** 2)
-        #     print 'sq', sq
-        #     print sum(sq)
-        #     print 'sq3', sq3
-        #     print sum(sq3)
         hpe_full.plotResult(i.dpt, i.gtcrop, jtI,"{}_optimized_{}".format(eval_prefix, ind))
         if ind < 100:
             ind += 1

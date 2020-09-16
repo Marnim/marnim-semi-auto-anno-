@@ -23,7 +23,7 @@ import getopt
 import numpy
 import os
 import pwd
-from PyQt4.QtGui import QApplication
+from PyQt5.QtWidgets import QApplication
 from data.importers import Blender2Importer
 from util.handpose_evaluation import Blender2HandposeEvaluation
 from util.interactivedetector import InteractiveDetector
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     person = "hpseq_loop_mv"
     start_idx = 0
     dataset = "blender"
-    data_folder = "/home/giffy/Documents/Datasets/Blender"
+    data_folder = "/home/giffy/Documents/Datasets/Blender_dataset/Blender"
 
     if dataset is None:
         print("Dataset must be specified:")

@@ -1080,6 +1080,12 @@ class MSRA15Importer(DepthImporter):
         """
 
         super(MSRA15Importer, self).__init__(241.42, 241.42, 160., 120.)  # see Sun et.al.
+        self.default_gtorig = np.asarray([[22, 65, 0], [48, 55, 0], [74, 28, 0], [87, 13, 0],
+                                          [8, 74, 0], [26, -2, 0], [33, -28, 0], [39, -50, 0],
+                                          [45, -68, 0], [-4, 71, 0], [0, 0, 0], [-1, -34, 0],
+                                          [0, -58, 0], [1, -78, 0], [-17, 71, 0], [-22, 7, 0],
+                                          [-28, -21, 0], [-30, -43, 0], [-33, -63, 0], [-25, 70, 0],
+                                          [-41, 18, 0]], np.float32)
 
         self.depth_map_size = (320, 240)
         self.basepath = basepath
@@ -1089,9 +1095,9 @@ class MSRA15Importer(DepthImporter):
         self.derotNet = derotNet
         self.detectorNet = detectorNet
         self.numJoints = 21
-        self.crop_joint_idx = 9
-        self.default_cubes = {'P0': (466, 466, 466),
-                              'P1': (156, 156, 156),
+        self.crop_joint_idx = 5
+        self.default_cubes = {'P0': (200, 200, 200),
+                              'P1': (200, 200, 200),
                               'P2': (179, 179, 179),
                               'P3': (157, 157, 157),
                               'P4': (146, 146, 146),
@@ -1148,7 +1154,6 @@ class MSRA15Importer(DepthImporter):
 
         if cube is None:
             config = {'cube': self.default_cubes[seqName]}
-            cub = self.default_cubes[seqName]
         else:
             assert isinstance(cube, tuple)
             assert len(cube) == 3
@@ -1254,15 +1259,15 @@ class MSRA15Importer(DepthImporter):
                     continue
 
                 try:
-                    varcube = 150 + 10 * scale
-                    cube_0 = (varcube, varcube, varcube)
-                    if cube is None:
-                        cube_ = cube_0
-                    else:
-                        cube_ = cube
-                    # dpt, M, com = hd.cropArea3D(com=gtorig[self.crop_joint_idx], size=cube_, docom=docom,dsize=(160,160))
-                    dpt, M, com = hd.cropArea3D(com = None, size=cube_, docom=docom,
-                                                dsize=(128, 128))
+                    # varcube = 150 + 10 * scale
+                    # cube_0 = (varcube, varcube, varcube)
+                    # if cube is None:
+                    #     cube_ = cube_0
+                    # else:
+                    #     cube_ = cube
+                    dpt, M, com = hd.cropArea3D(com=gtorig[self.crop_joint_idx], size=config['cube'], docom=docom)
+                    # dpt, M, com = hd.cropArea3D(com = None, size=cube_, docom=docom,
+                    #                             dsize=(128, 128))
                     #print cube_
                     # import matplotlib.pyplot as plt
                     # plt.imshow(dpt)
@@ -1280,7 +1285,7 @@ class MSRA15Importer(DepthImporter):
                 # self.showAnnotatedDepth(DepthFrame(dpt,gtorig,gtcrop,M,gt3Dorig,gt3Dcrop,com3D,dptFileName,'','',{}))
 
                 data.append(DepthFrame(dpt.astype(np.float32), gtorig, gtcrop, M, gt3Dorig, gt3Dcrop, com3D,
-                                       dptFileName, subSeqName, self.sides[seqName], {},cube_))
+                                       dptFileName, subSeqName, self.sides[seqName], {}, config['cube']))
                 pbar.update(pi)
                 pi += 1
             inputfile.close()
