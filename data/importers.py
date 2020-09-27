@@ -1095,7 +1095,7 @@ class MSRA15Importer(DepthImporter):
         self.derotNet = derotNet
         self.detectorNet = detectorNet
         self.numJoints = 21
-        self.crop_joint_idx = 5
+        self.crop_joint_idx = 9
         self.default_cubes = {'P0': (200, 200, 200),
                               'P1': (200, 200, 200),
                               'P2': (179, 179, 179),

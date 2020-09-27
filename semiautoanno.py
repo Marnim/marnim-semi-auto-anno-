@@ -1594,44 +1594,44 @@ class SemiAutoAnno:
                 ieq = T.concatenate([ieq, zzerr.flatten()], axis=0)
 
         # temp_joints = T.reshape(tsLi, (self.numJoints, 3))
-        mcps = self.hc.joint_dict["mcp"]
-        op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_mcp', borrow=True)
-        for mcp in mcps:
-            a = temp_joints[mcp[1]] - temp_joints[mcp[0]]
-            b = temp_joints[mcp[2]] - temp_joints[mcp[1]]
-            x = T.dot(a, b)
-            den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
-            op1 = T.set_subtensor(op1[mcp[1]], 90 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
-        if ieq is None:
-            ieq = op1.flatten()
-        else:
-            ieq = T.concatenate([ieq, op1.flatten()], axis=0)
-
-        pips = self.hc.joint_dict["pip"]
-        op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_pip', borrow=True)
-        for pip in pips:
-            a = temp_joints[pip[1]] - temp_joints[pip[0]]
-            b = temp_joints[pip[2]] - temp_joints[pip[1]]
-            x = T.dot(a, b)
-            den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
-            op1 = T.set_subtensor(op1[pip[1]], 110 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
-        if ieq is None:
-            ieq = op1.flatten()
-        else:
-            ieq = T.concatenate([ieq, op1.flatten()], axis=0)
-
-        dips = self.hc.joint_dict["dip"]
-        op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_dip', borrow=True)
-        for dip in dips:
-            a = temp_joints[dip[1]] - temp_joints[dip[0]]
-            b = temp_joints[dip[2]] - temp_joints[dip[1]]
-            x = T.dot(a, b)
-            den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
-            op1 = T.set_subtensor(op1[dip[1]], 90 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
-        if ieq is None:
-            ieq = op1.flatten()
-        else:
-            ieq = T.concatenate([ieq, op1.flatten()], axis=0)
+        # mcps = self.hc.joint_dict["mcp"]
+        # op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_mcp', borrow=True)
+        # for mcp in mcps:
+        #     a = temp_joints[mcp[1]] - temp_joints[mcp[0]]
+        #     b = temp_joints[mcp[2]] - temp_joints[mcp[1]]
+        #     x = T.dot(a, b)
+        #     den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
+        #     op1 = T.set_subtensor(op1[mcp[1]], 90 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
+        # if ieq is None:
+        #     ieq = op1.flatten()
+        # else:
+        #     ieq = T.concatenate([ieq, op1.flatten()], axis=0)
+        #
+        # pips = self.hc.joint_dict["pip"]
+        # op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_pip', borrow=True)
+        # for pip in pips:
+        #     a = temp_joints[pip[1]] - temp_joints[pip[0]]
+        #     b = temp_joints[pip[2]] - temp_joints[pip[1]]
+        #     x = T.dot(a, b)
+        #     den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
+        #     op1 = T.set_subtensor(op1[pip[1]], 110 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
+        # if ieq is None:
+        #     ieq = op1.flatten()
+        # else:
+        #     ieq = T.concatenate([ieq, op1.flatten()], axis=0)
+        #
+        # dips = self.hc.joint_dict["dip"]
+        # op1 = theano.shared(numpy.zeros(self.numJoints), name='joint_dip', borrow=True)
+        # for dip in dips:
+        #     a = temp_joints[dip[1]] - temp_joints[dip[0]]
+        #     b = temp_joints[dip[2]] - temp_joints[dip[1]]
+        #     x = T.dot(a, b)
+        #     den = T.nlinalg.norm(a, ord=None) * T.nlinalg.norm(b, ord=None)
+        #     op1 = T.set_subtensor(op1[dip[1]], 90 - T.true_div(T.mul(T.arccos(T.true_div(x, den)) , 180) , numpy.pi))
+        # if ieq is None:
+        #     ieq = op1.flatten()
+        # else:
+        #     ieq = T.concatenate([ieq, op1.flatten()], axis=0)
 
         # op1 = theano.shared(numpy.zeros(self.numJoints), name='coplanar1', borrow=True)
         # op2 = theano.shared(numpy.zeros(self.numJoints), name='coplanar2', borrow=True)

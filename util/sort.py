@@ -32,12 +32,10 @@ class find_reference_frames:
             print(min_distance.min(), min_distance.max(), np.median(min_distance))
             breaks = []
             median = np.median(min_distance)
-            prev = 0
-            ref_frames = []
+            ref_frames = [0]
             for i in range(min_distance.shape[0]):
                 if min_distance[i] > self.distance_threshold:
-                    ref_frames.append(sort_array[prev])
-                    prev = i
+                    ref_frames.append(sort_array[i+1])
             if not os.path.exists(self.eval_folder):
                 os.mkdir(self.eval_folder)
             np.save(self.eval_folder+ref_array_file, ref_frames)
