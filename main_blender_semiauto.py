@@ -264,7 +264,7 @@ if __name__ == '__main__':
     #                             "6958 7121 7293 7338 7455 7632 7756 7774 7814 7952 8012 8242 8272 8302 8317 8340", sep=" ", dtype=int)
 
     #this is a new implementation to calculate reference frames by VLM Giffy and Marnim.
-    reference_frame_calculator = find_reference_frames(eval_prefix, distance_threshold=0.04, force=True)
+    reference_frame_calculator = find_reference_frames(eval_prefix, distance_threshold=0.03, force=True)
     # reference_frame_calculator = find_reference_frames(eval_prefix, force=True, distance_threshold=28, dist_func='euclidean')
 
     subset_idxs = reference_frame_calculator.calculate_reference_frames(train_data)

@@ -45,11 +45,12 @@ __status__ = "Development"
 
 
 if __name__ == '__main__':
-    person = "P0"
+    person = "hpseq_loop_mv"
     start_idx = 0
-    dataset = "msra"
-    data_folder = "/home/giffy/Documents/Datasets/cvpr15_MSRAHandGestureDB"
-    eval_folder  = "msra_pose"
+    dataset = "blender"
+    data_folder = "/home/giffy/Documents/Datasets/Blender_dataset/Blender"
+    # data_folder = "/home/giffy/Documents/Datasets/cvpr15_MSRAHandGestureDB"
+    eval_folder  = "blender_pose"
 
     if dataset is None:
         print("Dataset must be specified:")
